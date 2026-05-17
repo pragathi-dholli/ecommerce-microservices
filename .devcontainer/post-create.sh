@@ -5,16 +5,21 @@ echo "================================================"
 echo "  E-Commerce Microservices — Codespace Setup"
 echo "================================================"
 
-# ── Force Java 17 ─────────────────────────────────────────────
-echo "→ Forcing Java 17..."
-source /root/.sdkman/bin/sdkman-init.sh
-sdk install java 17.0.10-tem
-sdk default java 17.0.10-tem
-echo 'export JAVA_HOME=/root/.sdkman/candidates/java/current' >> ~/.bashrc
+# ── Java 17 ─────────────────────────────────────────────
+echo "→ Installing Java 17 directly..."
+sudo apt-get update -q
+sudo apt-get install -y openjdk-17-jdk
+
+sudo update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+sudo update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 echo 'export PATH=$JAVA_HOME/bin:$PATH' >> ~/.bashrc
-source ~/.bashrc
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
 java -version
-echo "✅ Java 17 active"
+echo "✅ Done"
 
 # ── Install Maven if not present ──────────────────────────────
 if ! command -v mvn &> /dev/null; then
