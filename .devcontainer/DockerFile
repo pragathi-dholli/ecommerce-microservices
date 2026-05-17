@@ -1,0 +1,21 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl zip unzip git wget maven \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install SDKMAN and Java 17 explicitly
+RUN curl -s "https://get.sdkman.io" | bash
+SHELL ["/bin/bash", "-c"]
+RUN source /root/.sdkman/bin/sdkman-init.sh && \
+    sdk install java 17.0.10-tem && \
+    sdk default java 17.0.10-tem
+
+ENV JAVA_HOME=/root/.sdkman/candidates/java/current
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Create non-root user (required by Codespaces)
+RUN useradd -ms /bin/bash vscode
+USER vscode
+WORKDIR /workspaces

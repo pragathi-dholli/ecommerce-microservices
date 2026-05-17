@@ -1,0 +1,46 @@
+{
+  "name": "E-Commerce Microservices",
+
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "forwardPorts": [8081, 8082, 8083, 5432, 5433, 5434, 5050],
+
+  "portsAttributes": {
+    "8081": { "label": "Product Service",  "onAutoForward": "notify" },
+    "8082": { "label": "Order Service",    "onAutoForward": "notify" },
+    "8083": { "label": "Payment Service",  "onAutoForward": "notify" },
+    "5432": { "label": "Product DB",       "onAutoForward": "silent" },
+    "5433": { "label": "Order DB",         "onAutoForward": "silent" },
+    "5434": { "label": "Payment DB",       "onAutoForward": "silent" },
+    "5050": { "label": "pgAdmin",          "onAutoForward": "notify" }
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-spring-initializr",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-spring-boot-dashboard",
+        "ms-azuretools.vscode-docker",
+        "humao.rest-client",
+        "ckolkman.vscode-postgres",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions"
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4
+      }
+    }
+  }
+}
