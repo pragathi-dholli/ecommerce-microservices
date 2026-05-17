@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL for Payment Service ───────────────────────────────────────
+  payment-db:
+    image: postgres:16-alpine
+    container_name: payment-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"        # 5434 avoids clash with product (5432) and order (5433)
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Payment Service ───────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payment-service
+    restart: unless-stopped
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: payment-db
+      DB_PORT: 5432
+      DB_NAME: payment_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      SPRING_PROFILES_ACTIVE: docker
+      ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://order-service:8082}
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep UP || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # ── pgAdmin (optional) ────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: payment-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ecommerce.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5052:80"
+    depends_on:
+      - payment-db
+    profiles:
+      - tools
+
+volumes:
+  payment_db_data:
+    driver: local
+
+networks:
+  default:
+    name: ecommerce-network
+    external: true

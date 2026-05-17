@@ -1,0 +1,101 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: product-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:product_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      connection-timeout: 20000
+      pool-name: ProductServiceHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway manages schema; Hibernate just validates
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# ── RESILIENCE4J ──────────────────────────────────────────────────────────
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      productService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 5s
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 100
+        slow-call-duration-threshold: 2s
+
+  retry:
+    instances:
+      productService:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+
+  timelimiter:
+    instances:
+      productService:
+        timeout-duration: 3s
+
+# ── ACTUATOR (health, metrics) ────────────────────────────────────────────
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# ── FEIGN ─────────────────────────────────────────────────────────────────
+
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 2000
+        read-timeout: 5000
+        logger-level: BASIC
+  circuitbreaker:
+    enabled: true
+
+# ── LOGGING ───────────────────────────────────────────────────────────────
+
+logging:
+  level:
+    com.ecommerce.product: INFO
+    org.springframework.web: WARN
+    io.github.resilience4j: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

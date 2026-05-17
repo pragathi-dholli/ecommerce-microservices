@@ -1,0 +1,53 @@
+{
+  "family": "product-service-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "product-service",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ecommerce/product-service:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" }
+      ],
+      "secrets": [
+        { "name": "DB_HOST",     "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/ecommerce/product/db-host" },
+        { "name": "DB_PORT",     "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/ecommerce/product/db-port" },
+        { "name": "DB_NAME",     "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/ecommerce/product/db-name" },
+        { "name": "DB_USER",     "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/ecommerce/product/db-user" },
+        { "name": "DB_PASSWORD", "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/ecommerce/product/db-password" }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8081/actuator/health | grep UP || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/product-service",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "linuxParameters": {
+        "initProcessEnabled": true
+      }
+    }
+  ]
+}

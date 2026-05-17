@@ -1,0 +1,126 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:order_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      connection-timeout: 20000
+      pool-name: OrderServiceHikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_batch_fetch_size: 20
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# ── DOWNSTREAM SERVICE URLs ───────────────────────────────────────────────
+
+services:
+  product:
+    url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+  payment:
+    url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+
+# ── ORDER CONFIG ──────────────────────────────────────────────────────────
+
+order:
+  pending-timeout-minutes: 30
+  timeout-check-interval-ms: 300000   # 5 minutes
+
+# ── RESILIENCE4J ──────────────────────────────────────────────────────────
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      productService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 100
+        slow-call-duration-threshold: 3s
+      paymentService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 15s      # Payment is critical — longer recovery wait
+        failure-rate-threshold: 40            # Stricter threshold for payments
+        slow-call-duration-threshold: 5s
+
+  retry:
+    instances:
+      productService:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - feign.RetryableException
+      paymentService:
+        max-attempts: 2             # Only retry once — avoid duplicate charges
+        wait-duration: 1s
+
+  timelimiter:
+    instances:
+      productService:
+        timeout-duration: 4s
+      paymentService:
+        timeout-duration: 10s       # Payment processing can be slower
+
+# ── FEIGN ─────────────────────────────────────────────────────────────────
+
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 3000
+        read-timeout: 8000
+        logger-level: BASIC
+  circuitbreaker:
+    enabled: true
+
+# ── ACTUATOR ─────────────────────────────────────────────────────────────
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# ── LOGGING ───────────────────────────────────────────────────────────────
+
+logging:
+  level:
+    com.ecommerce.order: INFO
+    io.github.resilience4j: DEBUG
+    org.springframework.web: WARN

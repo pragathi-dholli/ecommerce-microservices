@@ -1,0 +1,29 @@
+# Maven
+**/target/
+**/*.class
+**/*.jar
+**/*.war
+
+# Spring Boot logs
+**/*.log
+**/logs/
+
+# Environment — NEVER commit
+**/.env
+
+# IDE
+.idea/
+**/*.iml
+.vscode/
+**/*.swp
+**/*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker overrides
+docker-compose.override.yml
+
+# Codespace / devcontainer generated
+.devcontainer/.env

@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL for Order Service ─────────────────────────────────────────
+  order-db:
+    image: postgres:16-alpine
+    container_name: order-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"        # 5433 avoids clash with product-service DB on 5432
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Order Service ─────────────────────────────────────────────────────────
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: unless-stopped
+    depends_on:
+      order-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: order-db
+      DB_PORT: 5432
+      DB_NAME: order_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      SPRING_PROFILES_ACTIVE: docker
+      # Point to other services — update if running full suite via shared compose
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL:-http://product-service:8081}
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://payment-service:8083}
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep UP || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # ── pgAdmin (optional) ────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: order-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ecommerce.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5051:80"
+    depends_on:
+      - order-db
+    profiles:
+      - tools
+
+volumes:
+  order_db_data:
+    driver: local
+
+networks:
+  default:
+    name: ecommerce-network
+    external: true   # Shared network across all microservices

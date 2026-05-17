@@ -1,0 +1,211 @@
+### ════════════════════════════════════════════════════
+###  E-Commerce Microservices — REST Client Requests
+###  Install: VS Code extension "humao.rest-client"
+###  Usage:   Click "Send Request" above any request
+### ════════════════════════════════════════════════════
+
+@productBase = http://localhost:8081/api/v1
+@orderBase   = http://localhost:8082/api/v1
+@paymentBase = http://localhost:8083/api/v1
+
+# ── PRODUCT SERVICE ────────────────────────────────────────
+
+### Health check
+GET http://localhost:8081/actuator/health
+
+### Create product
+POST {{productBase}}/products
+Content-Type: application/json
+
+{
+  "name": "Wireless Headphones",
+  "sku": "ELEC-WH-TEST-001",
+  "price": 199.99,
+  "stockQuantity": 100,
+  "category": "Electronics",
+  "brand": "SoundMax"
+}
+
+### Get product by SKU
+GET {{productBase}}/products/sku/ELEC-WH-TEST-001
+
+### Search products
+GET {{productBase}}/products/search?category=Electronics&minPrice=50&maxPrice=300
+
+### Check inventory
+POST {{productBase}}/products/inventory/check
+Content-Type: application/json
+
+{
+  "sku": "ELEC-WH-TEST-001",
+  "requestedQuantity": 2
+}
+
+### Low stock alert (threshold=50)
+GET {{productBase}}/products/low-stock?threshold=50
+
+# ── ORDER SERVICE ──────────────────────────────────────────
+
+### Health check
+GET http://localhost:8082/actuator/health
+
+### Create order (happy path — uses tok_success_* for payment)
+POST {{orderBase}}/orders
+Content-Type: application/json
+
+{
+  "order": {
+    "customerId": "CUST-001",
+    "customerEmail": "jane@example.com",
+    "items": [
+      { "productSku": "ELEC-WH-TEST-001", "quantity": 2 }
+    ],
+    "shippingAddress": {
+      "fullName": "Jane Doe",
+      "addressLine1": "123 Main Street",
+      "city": "Austin",
+      "state": "TX",
+      "postalCode": "78701",
+      "country": "US",
+      "phone": "+1-555-0100"
+    },
+    "notes": "Leave at door"
+  },
+  "paymentMethod": {
+    "type": "CARD",
+    "token": "tok_success_visa"
+  }
+}
+
+### Create order (payment declined — insufficient funds)
+POST {{orderBase}}/orders
+Content-Type: application/json
+
+{
+  "order": {
+    "customerId": "CUST-002",
+    "customerEmail": "bob@example.com",
+    "items": [
+      { "productSku": "ELEC-WH-TEST-001", "quantity": 1 }
+    ],
+    "shippingAddress": {
+      "fullName": "Bob Smith",
+      "addressLine1": "456 Oak Ave",
+      "city": "Dallas",
+      "state": "TX",
+      "postalCode": "75201",
+      "country": "US"
+    }
+  },
+  "paymentMethod": {
+    "type": "CARD",
+    "token": "tok_decline_funds"
+  }
+}
+
+### Get order by ID
+GET {{orderBase}}/orders/1
+
+### Get order by order number (replace with real number)
+GET {{orderBase}}/orders/number/ORD-A1B2C3D4
+
+### List orders for customer
+GET {{orderBase}}/orders/customer/CUST-001
+
+### Filter orders by status
+GET {{orderBase}}/orders?status=CONFIRMED&page=0&size=10
+
+### Update order status: CONFIRMED → PROCESSING
+PATCH {{orderBase}}/orders/1/status
+Content-Type: application/json
+
+{
+  "status": "PROCESSING",
+  "notes": "Picked and packed"
+}
+
+### Update order status: PROCESSING → SHIPPED
+PATCH {{orderBase}}/orders/1/status
+Content-Type: application/json
+
+{
+  "status": "SHIPPED",
+  "notes": "Tracking: 1Z999AA10123456784"
+}
+
+### Cancel order
+POST {{orderBase}}/orders/1/cancel?reason=Customer+request
+
+### Payment callback (simulate async payment result)
+POST {{orderBase}}/orders/payment-callback
+Content-Type: application/json
+
+{
+  "orderNumber": "ORD-A1B2C3D4",
+  "paymentId": "PAY-XYZ789",
+  "paymentStatus": "COMPLETED"
+}
+
+# ── PAYMENT SERVICE ────────────────────────────────────────
+
+### Health check
+GET http://localhost:8083/actuator/health
+
+### Initiate payment directly
+POST {{paymentBase}}/payments
+Content-Type: application/json
+
+{
+  "orderNumber": "ORD-DIRECT-001",
+  "amount": 99.99,
+  "currency": "USD",
+  "customerId": "CUST-001",
+  "customerEmail": "jane@example.com",
+  "paymentMethod": {
+    "type": "CARD",
+    "token": "tok_success_visa"
+  }
+}
+
+### Get payment by payment ID
+GET {{paymentBase}}/payments/PAY-ABC12345
+
+### Get payment by order number
+GET {{paymentBase}}/payments/order/ORD-DIRECT-001
+
+### List all payments (paginated)
+GET {{paymentBase}}/payments?page=0&size=10
+
+### Filter payments by status
+GET {{paymentBase}}/payments?status=COMPLETED
+
+### Full refund
+POST {{paymentBase}}/payments/PAY-ABC12345/refund
+Content-Type: application/json
+
+{
+  "reason": "Customer cancelled order"
+}
+
+### Partial refund
+POST {{paymentBase}}/payments/PAY-ABC12345/refund
+Content-Type: application/json
+
+{
+  "amount": 50.00,
+  "reason": "Partial item return"
+}
+
+### Refund by order number
+POST {{paymentBase}}/payments/order/ORD-DIRECT-001/refund
+
+# ── CIRCUIT BREAKERS ───────────────────────────────────────
+
+### Product Service circuit breakers
+GET http://localhost:8081/actuator/circuitbreakers
+
+### Order Service circuit breakers
+GET http://localhost:8082/actuator/circuitbreakers
+
+### Payment Service circuit breakers
+GET http://localhost:8083/actuator/circuitbreakers
